@@ -79,7 +79,9 @@ at boot with the offending key named, rather than surfacing as `undefined` later
 ## Layout
 
 ```
+.github/workflows/ci.yml    runs `npm run ci` + a docker build on every PR
 prisma/schema.prisma        models; connection URL lives in prisma.config.ts
+prisma/seed.ts              idempotent dev data (`npm run db:seed`)
 src/
   server.ts                 port binding, signals, graceful shutdown
   app.ts                    createApp() — middleware + routers, no listen()
@@ -88,7 +90,7 @@ src/
   lib/logger.ts             pino (pretty in development)
   lib/prisma.ts             PrismaClient + pg driver adapter
   lib/http-error.ts         HttpError and status helpers
-  middleware/               not-found, error-handler
+  middleware/               request-id, not-found, error-handler, validate
   modules/health/           router + controller + test — the shape to copy
   generated/prisma/         generated client (gitignored)
 ```
@@ -111,11 +113,51 @@ app.use('/api/v1/<name>', <name>Router)
 Express 5 forwards rejected promises to the error handler on its own, so `async`
 handlers need no `try/catch` and no wrapper — throw and let it propagate.
 
+### Validating input
+
+Never read `req.body` or `req.query` raw. Put a zod schema in front:
+
+```ts
+const createUser = z.object({ email: z.email(), name: z.string().min(1) })
+
+router.post('/', validate({ body: createUser }), (_req, res) => {
+  const { email, name } = validated(res, createUser)
+  ...
+})
+```
+
+A parse failure throws a `ZodError`, which the error handler turns into a 400
+listing the offending fields. `validate()` accepts `body`, `query` and `params`.
+
+Results land on `res.locals`, not on the request: Express 5 defines `req.query`
+as a getter with no setter, so parsed values cannot be written back. `validated()`
+reads them, typed from the same schema object you passed in.
+
+### Errors, request ids and rate limits
+
+Every response carries an `X-Request-Id`. An inbound one is reused, so an id set
+by a gateway follows the request through; otherwise a UUID is minted. Error
+responses repeat it in the envelope:
+
+```json
+{ "error": { "message": "...", "requestId": "..." } }
+```
+
+That id is on every log line for the request, so a user quoting it points
+straight at the failure — which matters because production replaces 5xx messages
+with a flat `Internal Server Error`.
+
+All routes except `/health` and `/ready` are rate limited per IP
+(`RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`). Probes are deliberately exempt so an
+orchestrator cannot throttle itself. The limiter is skipped entirely under
+`NODE_ENV=test` so a fast suite cannot trip it.
+
 ## Database changes
 
 ```bash
 # edit prisma/schema.prisma, then:
 npm run db:migrate           # names + applies a migration, regenerates the client
+npm run db:seed              # optional: idempotent dev data from prisma/seed.ts
 ```
 
 Commit the generated folder under `prisma/migrations/` — it is the migration
@@ -147,10 +189,33 @@ npm run ci
 The pre-commit hook (husky + lint-staged) already fixes and formats staged files,
 but it does not type-check or run tests. `npm run ci` does all four.
 
+GitHub Actions runs the same `npm run ci` on every PR into `main`, `stag` or
+`dev`, plus a second job that builds the production image — that one catches
+breakage the first cannot see, like a production dependency tree that fails to
+install. Coverage thresholds in `vitest.config.ts` are a ratchet set just under
+current coverage; raise them as the suite grows.
+
+## Branches
+
+```
+main ← stag ← dev ← <your-name>
+```
+
+Work on your own branch, PR into `dev`. `dev` is promoted to `stag`, `stag` to
+`main`. Start a new one from `dev`:
+
+```bash
+git fetch && git switch -c <your-name> origin/dev
+```
+
 ## Troubleshooting
 
 **`Invalid environment (APP_ENV=…, file …)`** — the named key is missing or
 malformed in that file. Compare against `.env.example`.
+
+**`CORS_ORIGIN: must list explicit origins in production, not "*"`** — a wildcard
+origin with `NODE_ENV=production` is refused at boot. Name the real frontend
+origins in `.env.stag` / `.env.prod`; both still ship placeholders.
 
 **`APP_ENV must be one of local, dev, stag, prod, test`** — typo in the exported
 variable.

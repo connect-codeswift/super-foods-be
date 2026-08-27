@@ -1,7 +1,6 @@
 # super-foods-be
 
-Express 5 + TypeScript + Prisma 7 backend for Universal Super Foods. Serves the
-`super-foods-fe` storefront.
+Express 5 + TypeScript + Prisma 7 backend.
 
 - **[DEV.md](./DEV.md)** — setup, workflow, conventions, adding a feature
 - **[DOCKER.md](./DOCKER.md)** — images, compose files, hot reload, deploys
@@ -39,14 +38,16 @@ Everything in containers instead, with hot reload: `npm run docker:up`.
 Dockerfile                  multi-stage: dev (hot reload), build, migrate, runner
 docker-compose.<env>.yml    one per environment: local, dev, stag, prod
 .env.<env>                  per-environment config, all gitignored
+.github/workflows/ci.yml    runs `npm run ci` + a docker build on every PR
 prisma/schema.prisma        models; connection URL lives in prisma.config.ts
+prisma/seed.ts              idempotent dev data (`npm run db:seed`)
 src/
   server.ts                 port binding, signals, graceful shutdown
   app.ts                    createApp() — middleware + routers, no listen()
   config/load-dotenv.ts     resolves APP_ENV, loads .env.<APP_ENV>
   config/env.ts             zod-validated process.env; throws at boot if invalid
   lib/                      logger, prisma, http-error
-  middleware/               not-found, error-handler
+  middleware/               request-id, not-found, error-handler, validate
   modules/health/           router + controller + test — the shape to copy
   generated/prisma/         generated client (gitignored)
 ```

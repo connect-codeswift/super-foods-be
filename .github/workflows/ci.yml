@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, stag, dev]
+  push:
+    branches: [main, stag, dev]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: type-check, lint, format, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # The client is gitignored, and tsc needs it to type-check.
+      # generate parses DATABASE_URL but never connects.
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          APP_ENV: test
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5433/placeholder
+
+      - run: npm run ci
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Catches breakage the verify job cannot see: the production
+      # dependency tree, install scripts, and the runtime image itself.
+      - name: Build runtime image
+        run: docker build --target runner -t super-foods-be:ci .
