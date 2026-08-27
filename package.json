@@ -1,0 +1,97 @@
+{
+  "name": "super-foods-be",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Universal Super Foods backend \u2014 Express + TypeScript + Prisma",
+  "type": "module",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "node esbuild.config.mjs",
+    "build:watch": "node esbuild.config.mjs --watch",
+    "start": "node dist/server.js",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "db:up": "docker compose -f docker-compose.local.yml up -d postgres",
+    "db:down": "docker compose -f docker-compose.local.yml down",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "docker:up": "docker compose -f docker-compose.local.yml up --build",
+    "docker:down": "docker compose -f docker-compose.local.yml down",
+    "docker:reset": "docker compose -f docker-compose.local.yml down -v",
+    "docker:logs": "docker compose -f docker-compose.local.yml logs -f api",
+    "docker:sh": "docker compose -f docker-compose.local.yml exec api sh",
+    "ci": "npm run type-check && npm run lint && npm run format:check && npm run test",
+    "prepare": "husky || true"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/connect-codeswift/super-foods-be.git"
+  },
+  "bugs": {
+    "url": "https://github.com/connect-codeswift/super-foods-be/issues"
+  },
+  "homepage": "https://github.com/connect-codeswift/super-foods-be#readme",
+  "keywords": [],
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.3.0",
+    "pg": "^8.23.0",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.4.0",
+    "@types/pg": "^8.23.1",
+    "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^4.1.11",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.11.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.4.1",
+    "pino-pretty": "^13.1.3",
+    "prettier": "^3.9.6",
+    "prisma": "^7.10.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.11"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "prisma@7.10.0": true,
+    "@prisma/engines@7.10.0": true
+  },
+  "lint-staged": {
+    "*.{ts,mjs,cjs,js}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

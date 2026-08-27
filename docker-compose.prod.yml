@@ -1,0 +1,45 @@
+# Production: built image against a managed database. No Postgres service here —
+# the connection string comes from .env.prod (or the platform's env).
+#   docker compose -f docker-compose.prod.yml up -d --build
+name: superfoods-prod
+
+services:
+  migrate:
+    build:
+      context: .
+      target: migrate
+    image: super-foods-be-migrate:${IMAGE_TAG:-latest}
+    env_file:
+      - .env.prod
+    environment:
+      APP_ENV: prod
+    restart: 'no'
+
+  api:
+    build:
+      context: .
+      target: runner
+    image: super-foods-be:${IMAGE_TAG:-latest}
+    container_name: superfoods-prod-api
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      APP_ENV: prod
+    ports:
+      - '${API_PORT:-3001}:3001'
+    # Schema changes land before the new code that depends on them.
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '${API_CPUS:-1.0}'
+          memory: ${API_MEMORY:-512M}
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'

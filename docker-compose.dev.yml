@@ -1,0 +1,57 @@
+# Shared development environment: built image, no bind mounts, own database.
+#   docker compose -f docker-compose.dev.yml up -d --build
+name: superfoods-dev
+
+services:
+  postgres:
+    image: docker.io/library/postgres:17-alpine
+    container_name: superfoods-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: superfoods
+      POSTGRES_PASSWORD: superfoods
+      POSTGRES_DB: superfoods_dev
+    # Bound to loopback: reachable by an SSH tunnel, not by the internet.
+    ports:
+      - '127.0.0.1:5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U superfoods -d superfoods_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      target: migrate
+    env_file:
+      - .env.dev
+    environment:
+      APP_ENV: dev
+      DATABASE_URL: postgresql://superfoods:superfoods@postgres:5432/superfoods_dev?schema=public
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      target: runner
+    container_name: superfoods-dev-api
+    restart: unless-stopped
+    env_file:
+      - .env.dev
+    environment:
+      APP_ENV: dev
+      DATABASE_URL: postgresql://superfoods:superfoods@postgres:5432/superfoods_dev?schema=public
+    ports:
+      - '3001:3001'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

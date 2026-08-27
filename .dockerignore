@@ -1,0 +1,19 @@
+.git
+.github
+node_modules
+dist
+coverage
+src/generated
+.husky
+*.log
+
+# Config arrives through compose env_file, never baked into an image.
+.env
+.env.*
+
+# Docs and editor cruft
+*.md
+!README.md
+.vscode
+.idea
+.DS_Store

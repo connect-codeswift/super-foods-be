@@ -1,0 +1,61 @@
+# Your machine: Postgres plus the API with hot reload.
+#   npm run docker:up      whole stack
+#   npm run db:up          Postgres only, app on the host via `npm run dev`
+name: superfoods-local
+
+services:
+  postgres:
+    image: docker.io/library/postgres:17-alpine
+    container_name: superfoods-local-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: superfoods
+      POSTGRES_PASSWORD: superfoods
+      POSTGRES_DB: superfoods
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U superfoods -d superfoods']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      target: dev
+    container_name: superfoods-local-api
+    restart: unless-stopped
+    command: npm run dev
+    env_file:
+      - .env.local
+    environment:
+      APP_ENV: local
+      # Inside the compose network the database is `postgres`, not localhost.
+      DATABASE_URL: postgresql://superfoods:superfoods@postgres:5432/superfoods?schema=public
+      # tsx watches through chokidar. inotify works on Linux bind mounts but
+      # not on the macOS/Windows VM boundary, so poll instead.
+      CHOKIDAR_USEPOLLING: 'true'
+      CHOKIDAR_INTERVAL: '300'
+    ports:
+      - '3001:3001'
+    volumes:
+      # Source is bind-mounted so edits on the host reload inside the container.
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - ./package.json:/app/package.json
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./prisma.config.ts:/app/prisma.config.ts
+      # Anonymous volumes keep the image's copies from being shadowed by the
+      # host's — node_modules holds platform-specific binaries, and the
+      # generated Prisma client is built for the image.
+      - /app/node_modules
+      - /app/src/generated
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
