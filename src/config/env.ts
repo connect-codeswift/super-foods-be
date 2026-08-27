@@ -10,9 +10,23 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   /** Comma-separated list of allowed origins, or `*` for any. */
   CORS_ORIGIN: z.string().min(1).default('*'),
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
 })
 
-const parsed = envSchema.safeParse(process.env)
+const parsed = envSchema
+  .superRefine((value, ctx) => {
+    // A wildcard origin in production is almost always an oversight, and a
+    // silent one. Fail the boot instead.
+    if (value.NODE_ENV === 'production' && value.CORS_ORIGIN === '*') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['CORS_ORIGIN'],
+        message: 'must list explicit origins in production, not "*"',
+      })
+    }
+  })
+  .safeParse(process.env)
 
 if (!parsed.success) {
   const details = parsed.error.issues
